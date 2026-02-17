@@ -8,12 +8,20 @@
 # Description: Build OpenWrt using GitHub Actions
 #
 ###############手动修改##############
-name: RAX3000M-eMMC_XR30-eMMC-hanwckf
+name: MT7981-eMMC-USB-hanwckf
 
 on:
   repository_dispatch:
   workflow_dispatch:
     inputs:
+      REPO_BRANCH:
+        description: 'Select Source Branch'
+        required: true
+        default: 'v7672'
+        type: choice
+        options:
+        - v7672
+        - v7661
       LAN_IP:
         description: 'Set LAN IP Address'
         required: true
@@ -39,7 +47,7 @@ on:
         - v7.6.6.1-fw-20231024
         - v7.6.6.1-fw-20240823
       EEPROM:
-        description: 'Use nx30pro eeprom and fixed WiFi MAC address'
+        description: 'Use nx30pro eeprom'
         required: true
         default: true
         type: boolean
@@ -64,14 +72,14 @@ env:
   ###############手动修改##############
   ##因为是两个设备，所以手动设置上传时候的打包名称和tag名称UPLOAD_TAG_NAME
   OPENWRT_NAME: hanwckf
-  UPLOAD_TAG_NAME: rax3000m-emmc_xr30-emmc
-  REPO_URL: https://github.com/hanwckf/immortalwrt-mt798x
-  REPO_BRANCH: openwrt-21.02
-  FEEDS_CONF: RAX3000M-eMMC_XR30-eMMC-hanwckf/feeds.conf.default
+  UPLOAD_TAG_NAME: mt7981-emmc-usb
+  REPO_URL: https://github.com/lgs2007m/immortalwrt-mt798x
+  REPO_BRANCH: ${{ github.event.inputs.REPO_BRANCH || 'v7672' }}
+  FEEDS_CONF: MT7981-eMMC-USB-hanwckf/feeds.conf.default
   RAX3000M_EMMC_DTS_FILE: target/linux/mediatek/files-5.4/arch/arm64/boot/dts/mediatek/mt7981-cmcc-rax3000m-emmc.dts
-  CONFIG_FILE: RAX3000M-eMMC_XR30-eMMC-hanwckf/.mtwifi-cfg.config
-  DIY_P1_SH: RAX3000M-eMMC_XR30-eMMC-hanwckf/diy-part1.sh
-  DIY_P2_SH: RAX3000M-eMMC_XR30-eMMC-hanwckf/diy-part2.sh
+  CONFIG_FILE: MT7981-eMMC-USB-hanwckf/.mtwifi-cfg.config
+  DIY_P1_SH: MT7981-eMMC-USB-hanwckf/diy-part1.sh
+  DIY_P2_SH: MT7981-eMMC-USB-hanwckf/diy-part2.sh
   SSH_ACTIONS: false
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
@@ -179,24 +187,16 @@ jobs:
         fi
         echo "Use WiFi Driver: $wifi_driver-fw-$firmware"
 
-    - name: 使用nx30pro的高功率eeprom并固定WiFi MAC地址
+    - name: 使用nx30pro的高功率eeprom
       if: github.event.inputs.EEPROM == 'true'
       run: |
         cd openwrt
         wifi_driver=$(echo "${{ github.event.inputs.WIFI_DRIVER }}" | sed -E 's/^(v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*/\1/')
         if [ "$wifi_driver" == "v7.6.6.1" ]; then
-                cp $GITHUB_WORKSPACE/RAX3000M-eMMC_XR30-eMMC-hanwckf/mt79xx_20220907-8b55f5_eeprom.tar.xz dl/mt79xx_20220907-8b55f5.tar.xz
+                cp $GITHUB_WORKSPACE/MT7981-eMMC-USB-hanwckf/mt79xx_20220907-8b55f5_eeprom.tar.xz dl/mt79xx_20220907-8b55f5.tar.xz
         else
-                cp $GITHUB_WORKSPACE/RAX3000M-eMMC_XR30-eMMC-hanwckf/mt79xx_20231229-4012a0_eeprom.tar.xz dl/mt79xx_20231229-4012a0.tar.xz
+                cp $GITHUB_WORKSPACE/MT7981-eMMC-USB-hanwckf/mt79xx_20231229-4012a0_eeprom.tar.xz dl/mt79xx_20231229-4012a0.tar.xz
         fi
-        ## 创建一个辅助文件。文件内容是写入MAC地址到dat文件，固定wifi MAC地址
-        echo -e "\t\tlocal wifi0_mac=\"\$(mmc_get_mac_binary factory 0x04)\"
-        \t\tsed -i \"/^MacAddress=.*/ {s/.*/MacAddress=\$wifi0_mac/;b;}; \\\$aMacAddress=\$wifi0_mac\" /etc/wireless/mediatek/mt7981.dbdc.b0.dat
-        \t\tlocal wifi1_mac=\"\$(macaddr_setbit_la \$wifi0_mac)\"
-        \t\tsed -i \"/^MacAddress=.*/ {s/.*/MacAddress=\$wifi1_mac/;b;}; \\\$aMacAddress=\$wifi1_mac\" /etc/wireless/mediatek/mt7981.dbdc.b1.dat" > temp_insert.txt
-        ## 将文本内容写入02_network
-        sed -i '/mediatek_setup_macs()/,/\};/ {/cmcc,rax3000m-emmc)/ {n;n;n;r temp_insert.txt
-        }}' target/linux/mediatek/mt7981/base-files/etc/board.d/02_network
 
     - name: 使用luci-app-mtk无线配置
       if: github.event.inputs.APP_MTK == 'true'
@@ -297,9 +297,9 @@ jobs:
         echo "- 登录地址：${{ env.IP_ADDR }}" >> release.txt
         echo "- 使用WiFi驱动${{ github.event.inputs.WIFI_DRIVER }}" >> release.txt
         if [[ "${{ env.EEPROM }}" == '-eeprom' ]]; then
-               echo "- 使用nx30pro高功率eeprom并固定WiFi MAC地址" >> release.txt
+               echo "- 使用nx30pro高功率eeprom" >> release.txt
         else
-               echo "- 未使用nx30pro高功率eeprom未固定WiFi MAC地址" >> release.txt
+               echo "- 未使用nx30pro高功率eeprom" >> release.txt
         fi
         if [[ "${{ env.WIFI_INTERFACE }}" == '-mtwifi' ]]; then
                 echo "- 使用hanwckf mtwifi-cfg原生luci无线配置工具" >> release.txt
